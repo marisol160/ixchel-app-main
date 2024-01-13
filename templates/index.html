@@ -1,0 +1,391 @@
+<!DOCTYPE html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Ixchel</title>
+    <link
+      rel="icon"
+      href="https://i.ibb.co/R94Ln26/Imagen1.png"
+      type="image/x-icon"
+      sizes="100*100 100*100"
+    />
+
+    <link
+      rel="stylesheet"
+      href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css"
+    />
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+    <script src="https://code.jquery.com/jquery-3.6.4.min.js"></script>
+    <style>
+      body {
+        min-height: 100vh;
+        margin: 0;
+        display: flex;
+        flex-direction: column;
+      }
+
+      .container {
+        flex: 1;
+        padding: 0px;
+      }
+
+      h1 {
+        color: #b8285c;
+        text-align: center;
+        margin-top: 20px;
+      }
+
+      label {
+        font-weight: bold;
+        margin-top: 10px;
+        display: block;
+      }
+
+      input {
+        width: 100%;
+        padding: 8px;
+        margin-top: 8px;
+        margin-bottom: 16px;
+        box-sizing: border-box;
+      }
+
+      button {
+        background-color: #b8285c;
+        color: white;
+        padding: 10px 20px;
+        border: none;
+        border-radius: 5px;
+        cursor: pointer;
+      }
+
+      button:hover {
+        background-color: #8c1c3d;
+      }
+
+      #chartContainer {
+        margin-top: 20px;
+      }
+
+      canvas {
+        border: 1px solid #ddd;
+        border-radius: 5px;
+        margin-top: 10px;
+      }
+
+      p {
+        margin: 10px 0;
+        color: #000000;
+      }
+
+      .critical {
+        color: #dc3545;
+      }
+
+      .stable {
+        color: #28a745;
+      }
+
+      .normal-range {
+        color: #007bff;
+      }
+
+      footer {
+        background-color: #b8285c;
+        color: white;
+        padding: 20px;
+        text-align: center;
+        margin-top: 20px;
+      }
+
+      .error-message {
+        color: #dc3545;
+        margin-top: 10px;
+      }
+
+      .blanco {
+        color: #ffffff;
+      }
+    </style>
+  </head>
+
+  <body>
+    <img src="https://i.ibb.co/qmmLWp0/marco.jpg" />
+    <div class="container">
+      <div class="row"></div>
+
+      <h1 class="text-center">SALUD NEONATAL DE IXCHEL</h1>
+      <br />
+      <div class="row">
+        <div class="col-md-2">
+          <label for="curp">Ingresa la CURP del bebé:</label>
+        </div>
+
+        <div class="col-md-6">
+          <input
+            type="text"
+            id="curp"
+            name="curp"
+            class="form-control mb-3"
+            oninput="this.value = this.value.toUpperCase()"
+            maxlength="18"
+          />
+          <div id="error-message" class="error-message"></div>
+          <div id="prediction-message" class="prediction-message"></div>
+        </div>
+
+        <div class="col-md-2">
+          <button
+            onclick="generateCharts()"
+            class="btn btn-danger btn-block mb-2"
+            style="background-color: #8c1c3d; border-color: #8C1C3D5"
+          >
+            Generar Gráficos
+          </button>
+        </div>
+      </div>
+
+      <div class="row">
+        <div class="col-md-8">
+          <div id="chartContainer"></div>
+        </div>
+        <div class="col-md-4">
+          <div id="datosInfante" class="card">
+            <!-- Contenido del card aquí -->
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      async function generateCharts() {
+        try {
+          const curp = document.getElementById("curp").value;
+
+          if (!curp || curp.trim() === "" || curp.trim().length < 18) {
+            const datosInfante = document.getElementById("datosInfante");
+            datosInfante.innerHTML = "";
+            const chartContainer = document.getElementById("chartContainer");
+            chartContainer.innerHTML = "";
+
+            document.getElementById("error-message").innerHTML =
+              "Por favor, ingresa una CURP válida.";
+            return;
+          } else {
+            document.getElementById("error-message").innerHTML = "";
+          }
+
+          const response = await axios.get(`/get_chart_data/${curp}`);
+          const chartData = response.data;
+          const months = Object.keys(chartData);
+
+          const chartContainer = document.getElementById("chartContainer");
+          chartContainer.innerHTML = "";
+
+          if (Object.keys(chartData).length === 0) {
+            // Si no se encuentra la CURP en la base de datos
+            const datosInfante = document.getElementById("datosInfante");
+            datosInfante.innerHTML = "";
+            const chartContainer = document.getElementById("chartContainer");
+            chartContainer.innerHTML = "";
+
+            document.getElementById("error-message").innerHTML =
+              "¡Por favor, ingrese una CURP válida!";
+            return;
+          }
+
+          months.forEach((month) => {
+            const canvasId = `chart${month}`;
+            const chartConfig = {
+              type: "line",
+              data: chartData[month],
+            };
+
+            const newDiv = document.createElement("div");
+            const newCanvas = document.createElement("canvas");
+            newCanvas.id = canvasId;
+            newCanvas.width = 400;
+            newCanvas.height = 200;
+
+            chartContainer.appendChild(newDiv);
+            newDiv.appendChild(newCanvas);
+
+            const ctx = newCanvas.getContext("2d");
+            new Chart(ctx, chartConfig);
+
+            const title = document.createElement("p");
+            title.innerHTML = chartData[month].title;
+            newDiv.appendChild(title);
+
+            const healthStatus = document.createElement("p");
+            healthStatus.innerHTML = getHealthStatus(
+              chartData[month].datasets[0].label,
+              chartData[month].datasets[0].data
+            );
+            newDiv.appendChild(healthStatus);
+
+            const predictionMessage = document.createElement("p");
+            predictionMessage.innerHTML = getPredictionQuality(
+              chartData[month].datasets[0].data,
+              chartData[month].datasets[0].label
+            );
+            newDiv.appendChild(predictionMessage);
+          });
+          cargarDatosInfante(curp);
+        } catch (error) {
+          console.error("Error al obtener datos del servidor", error);
+          document.getElementById("error-message").innerHTML =
+            "Error al obtener datos del servidor. Por favor, inténtalo de nuevo más tarde.";
+        }
+      }
+
+      function getHealthStatus(metric, data) {
+        let range;
+        let statusMessage;
+
+        switch (metric) {
+          case "Frecuencia Cardiaca":
+            range = { min: 80, max: 120 };
+            break;
+          case "Frecuencia Respiratoria":
+            range = { min: 20, max: 30 };
+            break;
+          case "Temperatura":
+            range = { min: 36.5, max: 37.5 };
+            break;
+          default:
+            range = { min: 0, max: 0 };
+            break;
+        }
+
+        const average =
+          data.reduce((sum, value) => sum + value, 0) / data.length;
+
+        if (average < range.min) {
+          statusMessage = "Estado crítico: Consulta al pediatra de inmediato.";
+        } else if (average <= range.max) {
+          statusMessage = "Estado estable: ¡Buen trabajo!";
+        } else {
+          statusMessage =
+            "Estado medio estable: Observa cualquier cambio y considera una consulta.";
+        }
+
+        return `${statusMessage} Rango normal: ${range.min} - ${range.max}`;
+      }
+
+      function getPredictionQuality(data, metric) {
+        const range = getRangeForMetric(metric);
+        const isPredictionGood = !data.some(
+          (value) => value < range.min || value > range.max
+        );
+
+        return isPredictionGood
+          ? `Predicción por mes: ¡todo está bien!`
+          : `Predicción por mes: ¡será mejor que cheques a tu bebé!`;
+      }
+
+      function getRangeForMetric(metric) {
+        switch (metric) {
+          case "Frecuencia Cardiaca":
+            return { min: 80, max: 120 };
+          case "Frecuencia Respiratoria":
+            return { min: 20, max: 30 };
+          case "Temperatura":
+            return { min: 36.5, max: 37.5 };
+          default:
+            return { min: 0, max: 0 };
+        }
+      }
+
+      async function generatePDF() {
+        try {
+          const curp = document.getElementById("curp").value;
+
+          if (!curp || curp.trim() === "") {
+            document.getElementById("error-message").innerHTML =
+              "Por favor, ingresa una CURP válida.";
+            return;
+          } else {
+            document.getElementById("error-message").innerHTML = "";
+          }
+
+          window.location.href = `/generate_and_download_pdf/${curp}`; // Cambiado a generate_and_download_pdf
+        } catch (error) {
+          console.error("Error al generar el PDF", error);
+          document.getElementById("error-message").innerHTML =
+            "Error al generar el PDF. Por favor, inténtalo de nuevo más tarde.";
+        }
+      }
+    </script>
+
+    <script>
+      function cargarDatosInfante(curp) {
+        const datosInfante = document.getElementById("datosInfante");
+        datosInfante.innerHTML = "";
+
+        $.ajax({
+          url: `/infante/${curp}`,
+          method: "GET",
+          dataType: "json",
+          success: function (data) {
+            if (Object.keys(data.infante).length === 0) {
+              // Si el JSON está vacío, no crear ni mostrar el card
+              const datosInfante = document.getElementById("datosInfante");
+              datosInfante.innerHTML = "";
+            } else {
+              const datosInfanteDiv = document.createElement("div");
+              datosInfanteDiv.classList.add("card", "border-secondary");
+              datosInfanteDiv.style.marginTop = "15px";
+
+              const cardBodyDiv = document.createElement("div");
+              cardBodyDiv.classList.add("card-body");
+
+              const image = document.createElement("img");
+              image.classList.add("card-img-top");
+              image.src = "https://i.ibb.co/mtpX3VS/marcoextenso.png";
+              image.alt = "";
+
+              cardBodyDiv.appendChild(image);
+
+              cardBodyDiv.innerHTML += `
+                            <p><strong>CURP:</strong> ${data.infante.curp}</p>
+                            <p><strong>Nombre:</strong> ${data.infante.nombre_infante} ${data.infante.ap_paterno} ${data.infante.ap_materno}</p>
+                            <p><strong>Género:</strong> ${data.infante.sexo}</p>
+                            <p><strong>Fec.Nacimiento:</strong> ${data.infante.fechanac}</p>
+                            <p><strong>Gpo.Sanguíneo:</strong> ${data.infante.tipo_sangre}</p>
+                            <p><strong>Peso (kg):</strong> ${data.infante.peso} <strong>      </strong> <strong>Talla (cm):</strong> ${data.infante.talla}</p>
+                        `;
+
+              datosInfanteDiv.appendChild(cardBodyDiv);
+              document
+                .getElementById("datosInfante")
+                .appendChild(datosInfanteDiv);
+              cardBodyDiv.appendChild(image);
+
+              const boton = document.createElement("button");
+              boton.textContent = "Generar PDF";
+              boton.id = "generarPDF";
+
+              boton.onclick = function () {
+                generatePDF();
+              };
+              boton.style.backgroundColor = "#8c1c3d";
+              datosInfanteDiv.appendChild(boton);
+            }
+          },
+          error: function (error) {
+            console.error("Error al cargar los datos del infante:", error);
+          },
+        });
+      }
+    </script>
+
+    <footer>
+      <p class="blanco">
+        Este programa no sustituirá a ningún profesional de salud. Atiende a tu
+        médico más cercano.
+      </p>
+    </footer>
+  </body>
+</html>
